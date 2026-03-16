@@ -4,7 +4,52 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ALM Manpower Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js">
+/* ════════════════════════════════════════════════
+   Extra KPI panels for sub-views
+════════════════════════════════════════════════ */
+
+function renderHcKpis(d) {
+  var el = document.getElementById('hcKpiGrid');
+  if (!el) return;
+  var hcVar = d.hc.totals.actualHC - d.hc.totals.targetHC;
+  var hcPct = d.hc.totals.targetHC > 0 ? Math.round(d.hc.totals.actualHC / d.hc.totals.targetHC * 100) : 0;
+  el.innerHTML =
+    kpiCard('kc-blue',  'TARGET HC',      '🎯', fmt(d.hc.totals.targetHC, 0), '',          d.monthName, '', '', '') +
+    kpiCard('kc-green', 'ACTUAL HC',       '👥', fmt(d.hc.totals.actualHC, 1), 'cv-green',  d.monthName,
+      hcVar >= 0 ? 'kb-green' : 'kb-red', (hcVar >= 0 ? '▲ +' : '▼ ') + fmt(hcVar, 1) + ' vs target', '') +
+    kpiCard('kc-orange','HC ACHIEVEMENT',  '📊', hcPct + '%', hcPct >= 100 ? 'cv-green' : 'cv-orange', d.monthName,
+      hcPct >= 100 ? 'kb-green' : hcPct >= 75 ? 'kb-orange' : 'kb-red',
+      hcPct >= 100 ? '✅ Target Met' : hcPct >= 75 ? '⚠ Near Target' : '❌ Below Target', '');
+}
+
+function renderWdKpis(d) {
+  var el = document.getElementById('wdKpiGrid');
+  if (!el) return;
+  var wdVar = d.hc.totals.actualWD - d.hc.totals.targetWD;
+  el.innerHTML =
+    kpiCard('kc-blue',  'TARGET WD',    '📅', fmt(d.hc.totals.targetWD, 0), '',         d.monthName, '', '', '') +
+    kpiCard('kc-green', 'ACTUAL WD',    '✅', fmt(d.hc.totals.actualWD, 2), 'cv-green', d.monthName,
+      wdVar >= 0 ? 'kb-green' : 'kb-red', (wdVar >= 0 ? '▲ +' : '▼ ') + fmt(wdVar, 2) + ' vs target', '') +
+    kpiCard('kc-orange','GROSS PROFIT', '💰', '₱' + fmtM(d.hc.totals.grossProfit), 'cv-orange', d.monthName, '', '', '');
+}
+
+function renderFinKpis(d) {
+  var el = document.getElementById('finKpiGrid');
+  if (!el) return;
+  var netPos = d.ae.netIncome >= 0;
+  el.innerHTML =
+    kpiCard('kc-orange','TOTAL REVENUE',  '💼', '₱' + fmtM(d.ae.actualRevenue),  'cv-orange', d.monthName,
+      d.ae.actualRevenue >= d.ae.targetRevenue ? 'kb-green' : 'kb-orange', d.ae.revenueAchievement + '% of target', '') +
+    kpiCard('kc-green', 'GROSS PROFIT',   '📈', '₱' + fmtM(d.ae.grossProfit),    'cv-green',  d.monthName, '', '', '') +
+    kpiCard(netPos ? 'kc-green' : 'kc-red', 'NET INCOME', '🏦',
+      (netPos ? '' : '-') + '₱' + fmtM(Math.abs(d.ae.netIncome)),
+      netPos ? 'cv-green' : 'cv-red', d.monthName,
+      netPos ? 'kb-green' : 'kb-red', netPos ? '▲ Profitable' : '▼ Net Loss', '') +
+    kpiCard('kc-blue',  'REV TARGET',    '🎯', '₱' + fmtM(d.ae.targetRevenue),  '',          d.monthName, '', '', '');
+}
+
+</script>
 <style>
 /* ═══════════════════════════════════════════════
    RESET & CSS VARIABLES
@@ -331,11 +376,11 @@ tbody tr.total-row td{
 
   <div class="sb-sec">Views</div>
   <nav class="sb-nav">
-    <div class="nav-item active"><span class="nav-icon">📊</span> Overview</div>
-    <div class="nav-item"><span class="nav-icon">👥</span> Headcount</div>
-    <div class="nav-item"><span class="nav-icon">📅</span> Working Days</div>
-    <div class="nav-item"><span class="nav-icon">💰</span> Financials</div>
-    <div class="nav-item"><span class="nav-icon">🏢</span> By Company</div>
+    <div class="nav-item active" data-view="overview"    onclick="switchView('overview')"   ><span class="nav-icon">📊</span> Overview</div>
+    <div class="nav-item"        data-view="headcount"   onclick="switchView('headcount')"  ><span class="nav-icon">👥</span> Headcount</div>
+    <div class="nav-item"        data-view="workingdays" onclick="switchView('workingdays')" ><span class="nav-icon">📅</span> Working Days</div>
+    <div class="nav-item"        data-view="financials"  onclick="switchView('financials')"  ><span class="nav-icon">💰</span> Financials</div>
+    <div class="nav-item"        data-view="bycompany"   onclick="switchView('bycompany')"   ><span class="nav-icon">🏢</span> By Company</div>
   </nav>
 
   <div class="sb-fy">
@@ -379,128 +424,142 @@ tbody tr.total-row td{
       <span class="spinner"></span>&nbsp; Loading data from Google Sheets…
     </div>
 
-    <!-- KPI -->
-    <div class="sec-head">Key Performance Indicators</div>
-    <div class="kpi-grid" id="kpiGrid">
-      <div class="kpi-card kc-blue"><div class="kc-top"><div class="kc-label">Target HC</div><div class="kc-icon">🎯</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:90px"></div></div>
-      <div class="kpi-card kc-green"><div class="kc-top"><div class="kc-label">Actual HC</div><div class="kc-icon">👥</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:90px"></div></div>
-      <div class="kpi-card kc-orange"><div class="kc-top"><div class="kc-label">Revenue</div><div class="kc-icon">💼</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:120px"></div></div>
-      <div class="kpi-card kc-green"><div class="kc-top"><div class="kc-label">Net Income</div><div class="kc-icon">📈</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:120px"></div></div>
-    </div>
-
-    <!-- TREND + SNAPSHOT -->
-    <div class="sec-head">Monthly Performance Trend</div>
-    <div class="cr cr-13">
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>Monthly Performance Trend</h3><p>Total HC · Gross Profit · Net Income</p></div>
-          <span class="cc-badge ccb-blue" id="trendBadge">Full Year</span>
-        </div>
-        <div class="chart-wrap cw-300"><canvas id="chartTrend"></canvas></div>
+    <!-- VIEW: OVERVIEW -->
+    <div id="sec-overview" class="view-section">
+      <div class="sec-head">Key Performance Indicators</div>
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi-card kc-blue"><div class="kc-top"><div class="kc-label">Target HC</div><div class="kc-icon">🎯</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:90px"></div></div>
+        <div class="kpi-card kc-green"><div class="kc-top"><div class="kc-label">Actual HC</div><div class="kc-icon">👥</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:90px"></div></div>
+        <div class="kpi-card kc-orange"><div class="kc-top"><div class="kc-label">Revenue</div><div class="kc-icon">💼</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:120px"></div></div>
+        <div class="kpi-card kc-green"><div class="kc-top"><div class="kc-label">Net Income</div><div class="kc-icon">📈</div></div><div class="kc-value" style="background:var(--border);height:32px;border-radius:5px;width:120px"></div></div>
       </div>
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3 id="snapTitle">Period KPIs</h3><p>Selected period snapshot</p></div>
-          <span class="cc-badge ccb-green" id="snapBadge">–</span>
+      <div class="sec-head">Monthly Performance Trend</div>
+      <div class="cr cr-13">
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>Monthly Performance Trend</h3><p>Total HC · Gross Profit · Net Income</p></div>
+            <span class="cc-badge ccb-blue" id="trendBadge">Full Year</span>
+          </div>
+          <div class="chart-wrap cw-300"><canvas id="chartTrend"></canvas></div>
         </div>
-        <div class="snap-grid" id="snapGrid"></div>
-        <div style="text-align:center;border-top:1px solid var(--border);padding-top:12px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Revenue Achievement</div>
-          <div class="donut-rel">
-            <canvas id="chartDonut" width="130" height="130"></canvas>
-            <div class="donut-abs">
-              <div class="donut-pct" id="donutPct">–%</div>
-              <div class="donut-lbl">of target</div>
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3 id="snapTitle">Period KPIs</h3><p>Selected period snapshot</p></div>
+            <span class="cc-badge ccb-green" id="snapBadge">–</span>
+          </div>
+          <div class="snap-grid" id="snapGrid"></div>
+          <div style="text-align:center;border-top:1px solid var(--border);padding-top:12px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Revenue Achievement</div>
+            <div class="donut-rel">
+              <canvas id="chartDonut" width="130" height="130"></canvas>
+              <div class="donut-abs">
+                <div class="donut-pct" id="donutPct">–%</div>
+                <div class="donut-lbl">of target</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- HC -->
-    <div class="sec-head">Headcount Analysis</div>
-    <div class="cr cr-2">
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>Target vs Actual HC — By Company</h3><p>Headcount comparison per client</p></div>
-          <span class="cc-badge ccb-blue" id="hcBarBadge">–</span>
+    <!-- VIEW: HEADCOUNT -->
+    <div id="sec-headcount" class="view-section" style="display:none">
+      <div class="sec-head">Headcount Analysis</div>
+      <div class="cr cr-2">
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>Target vs Actual HC — By Company</h3><p>Headcount comparison per client</p></div>
+            <span class="cc-badge ccb-blue" id="hcBarBadge">–</span>
+          </div>
+          <div class="chart-wrap cw-260"><canvas id="chartHcBar"></canvas></div>
         </div>
-        <div class="chart-wrap cw-260"><canvas id="chartHcBar"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>HC Achievement Rate</h3><p>Actual ÷ Target × 100 per company</p></div>
-          <span class="cc-badge ccb-orange" id="hcAchBadge">–</span>
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>HC Achievement Rate</h3><p>Actual ÷ Target × 100 per company</p></div>
+            <span class="cc-badge ccb-orange" id="hcAchBadge">–</span>
+          </div>
+          <div class="chart-wrap cw-260"><canvas id="chartHcAch"></canvas></div>
         </div>
-        <div class="chart-wrap cw-260"><canvas id="chartHcAch"></canvas></div>
       </div>
+      <div class="sec-head">Headcount Summary</div>
+      <div class="kpi-grid" id="hcKpiGrid" style="grid-template-columns:repeat(3,1fr)"></div>
     </div>
 
-    <!-- WD & GP -->
-    <div class="sec-head">Working Days &amp; Gross Profit</div>
-    <div class="cr cr-2">
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>Working Days — By Company</h3><p>Target vs Actual working days</p></div>
-          <span class="cc-badge ccb-orange" id="wdBadge">–</span>
+    <!-- VIEW: WORKING DAYS -->
+    <div id="sec-workingdays" class="view-section" style="display:none">
+      <div class="sec-head">Working Days &amp; Gross Profit</div>
+      <div class="cr cr-2">
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>Working Days — By Company</h3><p>Target vs Actual working days</p></div>
+            <span class="cc-badge ccb-orange" id="wdBadge">–</span>
+          </div>
+          <div class="chart-wrap cw-260"><canvas id="chartWd"></canvas></div>
         </div>
-        <div class="chart-wrap cw-260"><canvas id="chartWd"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>Gross Profit Trend</h3><p>Monthly GP — total all companies</p></div>
-          <span class="cc-badge ccb-green">Full Year</span>
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>Gross Profit Trend</h3><p>Monthly GP — total all companies</p></div>
+            <span class="cc-badge ccb-green">Full Year</span>
+          </div>
+          <div class="chart-wrap cw-260"><canvas id="chartGp"></canvas></div>
         </div>
-        <div class="chart-wrap cw-260"><canvas id="chartGp"></canvas></div>
       </div>
+      <div class="sec-head">Working Days Summary</div>
+      <div class="kpi-grid" id="wdKpiGrid" style="grid-template-columns:repeat(3,1fr)"></div>
     </div>
 
-    <!-- FINANCIALS -->
-    <div class="sec-head">Financial Performance</div>
-    <div class="cr cr-3">
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>Revenue: Target vs Actual</h3><p id="revSub">Period comparison</p></div>
-          <span class="cc-badge ccb-blue" id="revBadge">–</span>
+    <!-- VIEW: FINANCIALS -->
+    <div id="sec-financials" class="view-section" style="display:none">
+      <div class="sec-head">Financial Performance</div>
+      <div class="cr cr-3">
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>Revenue: Target vs Actual</h3><p id="revSub">Period comparison</p></div>
+            <span class="cc-badge ccb-blue" id="revBadge">–</span>
+          </div>
+          <div class="chart-wrap cw-200"><canvas id="chartRevBar"></canvas></div>
         </div>
-        <div class="chart-wrap cw-200"><canvas id="chartRevBar"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>Revenue Trend</h3><p>Monthly actual revenue</p></div>
-          <span class="cc-badge ccb-blue">Full Year</span>
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>Revenue Trend</h3><p>Monthly actual revenue</p></div>
+            <span class="cc-badge ccb-blue">Full Year</span>
+          </div>
+          <div class="chart-wrap cw-200"><canvas id="chartRevLine"></canvas></div>
         </div>
-        <div class="chart-wrap cw-200"><canvas id="chartRevLine"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="cc-head">
-          <div class="cc-head-l"><h3>Net Income Trend</h3><p>Monthly net income / (loss)</p></div>
-          <span class="cc-badge ccb-orange">Full Year</span>
+        <div class="chart-card">
+          <div class="cc-head">
+            <div class="cc-head-l"><h3>Net Income Trend</h3><p>Monthly net income / (loss)</p></div>
+            <span class="cc-badge ccb-orange">Full Year</span>
+          </div>
+          <div class="chart-wrap cw-200"><canvas id="chartNetLine"></canvas></div>
         </div>
-        <div class="chart-wrap cw-200"><canvas id="chartNetLine"></canvas></div>
       </div>
+      <div class="sec-head">Financial Summary</div>
+      <div class="kpi-grid" id="finKpiGrid"></div>
     </div>
 
-    <!-- TABLE -->
-    <div class="sec-head">Headcount Detail Table</div>
-    <div class="table-card">
-      <div class="tc-head">
-        <h3 id="tableTitle">Company HC &amp; Working Days</h3>
-        <span id="tableSub"></span>
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Company</th><th>Target HC</th><th>Actual HC</th>
-              <th>HC Var</th><th>Achievement</th>
-              <th>Target WD</th><th>Actual WD</th><th>Gross Profit (₱)</th>
-            </tr>
-          </thead>
-          <tbody id="hcTbody">
-            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">Loading…</td></tr>
-          </tbody>
-        </table>
+    <!-- VIEW: BY COMPANY -->
+    <div id="sec-bycompany" class="view-section" style="display:none">
+      <div class="sec-head">Headcount Detail Table</div>
+      <div class="table-card">
+        <div class="tc-head">
+          <h3 id="tableTitle">Company HC &amp; Working Days</h3>
+          <span id="tableSub"></span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th><th>Target HC</th><th>Actual HC</th>
+                <th>HC Var</th><th>Achievement</th>
+                <th>Target WD</th><th>Actual WD</th><th>Gross Profit (₱)</th>
+              </tr>
+            </thead>
+            <tbody id="hcTbody">
+              <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -512,6 +571,7 @@ tbody tr.total-row td{
    State
 ════════════════════════════════════════════════ */
 var CHARTS = {};
+var currentData = null;
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 var C = {
@@ -524,6 +584,43 @@ var C = {
   red:        '#dc2626',
   border:     '#e2e8f0', text:'#0f172a', muted:'#64748b',
 };
+
+/* ════════════════════════════════════════════════
+   View Switching
+════════════════════════════════════════════════ */
+var CURRENT_VIEW = 'overview';
+
+function switchView(view) {
+  CURRENT_VIEW = view;
+  // Active nav highlight
+  document.querySelectorAll('.nav-item').forEach(function(el){
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  // Show/hide sections
+  document.querySelectorAll('.view-section').forEach(function(el){
+    el.style.display = 'none';
+  });
+  var target = document.getElementById('sec-' + view);
+  if (target) {
+    target.style.display = 'block';
+    setTimeout(function(){ Object.values(CHARTS).forEach(function(c){if(c)c.resize();}); }, 60);
+  }
+  // Update subtitle
+  var labels = {
+    overview:   'Performance Dashboard · Manpower & Financial Overview',
+    headcount:  'Headcount · Target vs Actual by Company',
+    workingdays:'Working Days · Target vs Actual by Company',
+    financials: 'Financials · Revenue · Gross Profit · Net Income',
+    bycompany:  'By Company · Detailed Headcount & Working Days Table'
+  };
+  document.querySelector('.topbar-left p').textContent = labels[view] || '';
+  // Render extras
+  if (currentData) {
+    if (view === 'headcount')   renderHcKpis(currentData);
+    if (view === 'workingdays') renderWdKpis(currentData);
+    if (view === 'financials')  renderFinKpis(currentData);
+  }
+}
 
 /* ════════════════════════════════════════════════
    Boot
@@ -567,7 +664,7 @@ function onFilterChange(){ loadData(); }
 /* ════════════════════════════════════════════════
    ⚙️  CONFIGURATION — paste your Apps Script URL here
 ════════════════════════════════════════════════ */
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzJiOGumHv1bAjD9rlSIlDnj8zxWR3uaO0TnJsSRcHBXDytIH4nTZUzgkqSgh3Nzfw/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1ozt29rZv_YpPsO74MTkkHRgiNQGjSV_Nc1GBzF3iJ1jrvTd_X04dTlj13_uBJWI/exec';
 
 /* ════════════════════════════════════════════════
    Load
@@ -602,6 +699,7 @@ function loadData() {
    Render
 ════════════════════════════════════════════════ */
 function render(d) {
+  currentData = d;
   var mn = d.monthName;
   // update badges
   ['trendBadge','snapBadge','hcBarBadge','hcAchBadge','wdBadge','revBadge'].forEach(function(id){
