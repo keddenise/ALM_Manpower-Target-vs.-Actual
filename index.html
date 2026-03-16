@@ -677,22 +677,30 @@ function loadData() {
 
   var url = APPS_SCRIPT_URL + '?year=' + year + '&month=' + month;
 
-  fetch(url)
-    .then(function(res) {
-      if (!res.ok) throw new Error('Network response was not ok: ' + res.status);
-      return res.json();
-    })
-    .then(function(d) {
-      document.getElementById('btnRefresh').disabled = false;
-      if (d.error) { setStatus('error', '⚠ ' + d.error); return; }
-      render(d);
-      setStatus('ok', '✔  ' + d.year + ' · ' + d.monthName + ' · Updated ' + new Date().toLocaleTimeString());
-      document.getElementById('footerStatus').textContent = 'Updated ' + new Date().toLocaleTimeString();
-    })
-    .catch(function(err) {
-      document.getElementById('btnRefresh').disabled = false;
-      setStatus('error', '⚠ Error: ' + err.message + ' — Check APPS_SCRIPT_URL or re-deploy script.');
-    });
+  // Use no-cors-safe approach via script tag (JSONP-style) to bypass CORS
+  var callbackName = 'almCb_' + Date.now();
+  var script = document.createElement('script');
+
+  window[callbackName] = function(d) {
+    // Cleanup
+    delete window[callbackName];
+    document.body.removeChild(script);
+    document.getElementById('btnRefresh').disabled = false;
+    if (d.error) { setStatus('error', '⚠ ' + d.error); return; }
+    render(d);
+    setStatus('ok', '✔  ' + d.year + ' · ' + d.monthName + ' · Updated ' + new Date().toLocaleTimeString());
+    document.getElementById('footerStatus').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  };
+
+  script.onerror = function() {
+    delete window[callbackName];
+    try { document.body.removeChild(script); } catch(e) {}
+    document.getElementById('btnRefresh').disabled = false;
+    setStatus('error', '⚠ Failed to load data. Check that Apps Script is deployed as "Anyone" access.');
+  };
+
+  script.src = url + '&callback=' + callbackName;
+  document.body.appendChild(script);
 }
 
 /* ════════════════════════════════════════════════
